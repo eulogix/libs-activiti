@@ -1,0 +1,29 @@
+{
+    "name": "eulogix/libs-activiti",
+    "type": "library",
+    "description": "Eulogix PHP Activiti libraries",
+    "keywords": [],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Pietro Baricco",
+            "email": "pietro@eulogix.com"
+        }
+    ],
+    "repositories": [
+        {
+            "type": "vcs",
+            "url": "https://github.com/eulogix/libs-misc.git",
+            "reference": "origin/master"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.3",
+        "eulogix/libs-misc": "@dev"
+    },
+    "autoload": {
+        "psr-4": {
+            "Eulogix\\Lib\\": "src/Eulogix/Lib/"
+        }
+    }
+}
