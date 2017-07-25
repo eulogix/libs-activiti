@@ -25,6 +25,8 @@ class ActivitiClient {
     const PARAM_ORDER = 'order';
     const PARAM_SIZE = 'size';
 
+    const NULL = '*null*';
+
     /**
      * @var string
      */
@@ -83,7 +85,7 @@ class ActivitiClient {
                      return new ActivitiResult($jsonDec);
                 else return $jsonDec;
             }
-            return $resultBody;
+            return $resultBody ? $resultBody : $statusCode;
         } else {
             $message = 'HTTP '.$statusCode.' : '.@$returnCodes[$statusCode];
 
@@ -264,43 +266,19 @@ class ActivitiClient {
      * @return ActivitiResult
      */
     public function getUserTaskCount($assignee, $inputHash=[]) {
-        $select = " SELECT  procdef.key_,
-                            count(*) as task_count";
-        $from = "   FROM act_ru_task task
-                    LEFT JOIN act_re_procdef procdef ON procdef.id_=task.proc_def_id_
-                    LEFT JOIN act_ru_execution pi ON pi.id_ = task.proc_inst_id_";
-
-        $wc = ['task.assignee_=:user'];
-        $qp = [':user'=>$assignee];
-
-        foreach($inputHash as $k => $v) {
-            switch($k) {
-                case 'processInstanceBusinessKeyLike' : {
-                    $wc[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike";
-                    $qp[':processInstanceBusinessKeyLike'] = $v;
-                    break;
-                }
-            }
-        }
-
-        $groupBy = "GROUP BY procdef.key_";
-        $orderBy = "ORDER BY task_count DESC";
-
-        return $this->returnSQLResultset($select, $from, 'WHERE '.implode(' AND ', $wc), $groupBy, $orderBy, [
-                self::PARAM_START => 0,
-                self::PARAM_SIZE => 9999
-            ], $qp);
+        return $this->getFlatListOfTasks($inputHash, true);
     }
 
     /**
      * This method mimics the getListOfTasks method, but uses raw SQL to overcome a limitation/bug in activiti
      * (up to at least 5.17.0), that breaks searching for process instance business key.
      * Hopefully, this will be removed once the Activiti REST implementation gets fixed.
+     * It also allows for a more complex combination of criteria
      *
      * @param array $inputHash
      * @return ActivitiResult
      */
-    public function getFlatListOfTasks($inputHash = []) {
+    public function getFlatListOfTasks($inputHash = [], $count=false) {
 
         $select = "select  t.id_ AS \"id\",
                         t.execution_id_ AS \"executionId\",
@@ -329,30 +307,85 @@ class ActivitiClient {
                         LEFT JOIN act_re_procdef procdef ON procdef.id_= t.proc_def_id_
                         LEFT JOIN act_ru_execution pi ON pi.id_ = t.proc_inst_id_";
 
-        $wc = ['TRUE']; $qp = [];
+        $mainWhereClauses = ['TRUE'];
+        $parameters = [];
+        $assignmentWhereClauses = [];
+
         foreach($inputHash as $k => $v) {
             switch($k) {
                 case 'processInstanceBusinessKeyLike' : {
-                    $wc[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike";
-                    $qp[':processInstanceBusinessKeyLike'] = $v;
+                    if(is_array($v)) {
+                        $conditions = [];
+                        $i = 0;
+                        foreach($v as $vl) {
+                            $conditions[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike{$i}";
+                            $parameters[":processInstanceBusinessKeyLike{$i}"] = $vl;
+                            $i++;
+                        }
+                        $mainWhereClauses[] = "(". implode(' OR ', $conditions) . ")";
+                    } else {
+                        $mainWhereClauses[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike";
+                        $parameters[':processInstanceBusinessKeyLike'] = $v;
+                    }
                     break;
                 }
                 case 'processDefinitionKeyLike' : {
-                    $wc[] = "procdef.key_ LIKE :processDefinitionKeyLike";
-                    $qp[':processDefinitionKeyLike'] = $v;
+                    $mainWhereClauses[] = "procdef.key_ LIKE :processDefinitionKeyLike";
+                    $parameters[':processDefinitionKeyLike'] = $v;
                     break;
                 }
+                //following conditions are OR'd, unless "null" is passed, in which case the condition becomes negative and is ANDed
                 case 'assignee' : {
-                    $wc[] = "t.assignee_ = :assignee";
-                    $qp[':assignee'] = $v;
+                    if($v == self::NULL)
+                        $mainWhereClauses[] = "t.assignee_ IS NULL";
+                    else {
+                        $assignmentWhereClauses[] = "t.assignee_ = :assignee";
+                        $parameters[':assignee'] = $v;
+                    }
+                    break;
+                }
+                case 'candidateUser' : {
+                    $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE user_id_ = :candidateUser)";
+                    $parameters[':candidateUser'] = $v;
+                    break;
+                }
+                case 'candidateGroup' : {
+                    if(is_array($v)) {
+                        $conditions = [];
+                        $i = 0;
+                        foreach($v as $vl) {
+                            $conditions[] = "group_id_ = :candidateGroup{$i}";
+                            $parameters[":candidateGroup{$i}"] = $vl;
+                            $i++;
+                        }
+                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE (". implode(' OR ', $conditions) . "))";
+                    } else {
+                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE group_id_ = :candidateGroup)";
+                        $parameters[':candidateGroup'] = $v;
+                        break;
+                    }
                     break;
                 }
             }
         }
 
+        if(empty($assignmentWhereClauses))
+            $assignmentWhereClauses = ['TRUE'];
+
+        $mainWhereClauses[] = '('.implode(' OR ', $assignmentWhereClauses).')';
+
         $orderBy = '';
 
-        return $this->returnSQLResultset($select, $from, 'WHERE '.implode(' AND ', $wc), $groupBy = '', $orderBy, $inputHash, $qp);
+        if($count) {
+            $innerSQL = $select.' '.$from.' WHERE '.implode(' AND ', $mainWhereClauses);
+
+            $groupBy = "GROUP BY \"processDefinitionKey\"";
+            $orderBy = "ORDER BY task_count DESC";
+            return $this->returnSQLResultset("SELECT  \"processDefinitionKey\", count(*) as task_count "," FROM ( {$innerSQL} ) AS tmp_ ", " WHERE TRUE ", $groupBy, $orderBy, [
+                self::PARAM_START => 0,
+                self::PARAM_SIZE => 9999
+            ], $parameters);
+        } else return $this->returnSQLResultset($select, $from, 'WHERE '.implode(' AND ', $mainWhereClauses), $groupBy = '', $orderBy, $inputHash, $parameters);
     }
 
     /**
@@ -1935,6 +1968,18 @@ class ActivitiClient {
     }
 
     /**
+     * @param string $taskId
+     * @param string $assignee
+     * @return bool
+     */
+    public function claimTask($taskId, $assignee) {
+        return $this->taskActions($taskId, json_encode([
+            "action" => "claim",
+            "assignee" => $assignee
+        ])) == 200;
+    }
+
+    /**
      * Delete a task
      * @param string $taskId The id of the task to delete.
      * @param mixed $cascadeHistory
@@ -1980,6 +2025,23 @@ class ActivitiClient {
                 200 => 'Indicates the task was found and the requested variables are returned.',
                 404 => 'Indicates the requested task was not found.',
             ));
+        return $ret;
+    }
+
+    /**
+     * @param string $taskId
+     * @param string $scope
+     * @return array
+     */
+    public function getAllVariablesForTaskRecursive($taskId, $scope) {
+        $vars = $this->getAllVariablesForTask($taskId, $scope);
+        $ret = [];
+        foreach($vars as &$var) {
+            if(@$var['valueUrl']) {
+                $var['serializedJavaObject'] = $this->getTheBinaryDataForVariable($taskId, $var['name'], $scope);
+            }
+            $ret[] = $var;
+        }
         return $ret;
     }
 
