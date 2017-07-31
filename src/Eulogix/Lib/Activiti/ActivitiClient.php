@@ -2243,7 +2243,7 @@ class ActivitiClient {
 
      * @throws \Exception
 
-     * @return ActivitiResult
+     * @return array
      **/
     public function getAllIdentityLinksForTask($taskId) {
         $requestBody = null;

@@ -286,5 +286,39 @@ class Task extends baseOMClass {
     {
         return $this->url;
     }
-    
+
+    /**
+     * @param string $user
+     * @return boolean
+     */
+    public function isAssignedTo($user)
+    {
+        return $this->getAssignee() == $user;
+    }
+
+    /**
+     * @param string $user
+     * @param string[] $groups
+     * @return boolean
+     */
+    public function canBeClaimedBy($user, array $groups)
+    {
+        $identityLinks = $this->getIdentityLinks();
+        foreach($identityLinks as $link)
+            if($link->isCandidate() && ($link->getUser() == $user || in_array($link->getGroup(), $groups)))
+                return true;
+        return false;
+    }
+
+    /**
+     * @return IdentityLink[]
+     */
+    public function getIdentityLinks() {
+        $client = $this->getClient();
+        $identities = $this->getClient()->getAllIdentitylinksForTask($this->getId());
+        return array_map(function($identityArray) use ($client) {
+            return new IdentityLink($identityArray, $client);
+        }, $identities);
+    }
+
 } 
