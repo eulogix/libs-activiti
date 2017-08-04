@@ -232,6 +232,15 @@ class Task extends baseOMClass {
     }
 
     /**
+     * useful to access the key without a server roundtrip to fetch the definition
+     * @return string
+     */
+    public function getProcessDefinitionKey()
+    {
+        return preg_replace('/:[0-9]+:[0-9]+$/sim', '', $this->getProcessDefinitionId());
+    }
+
+    /**
      * @return string
      */
     public function getProcessDefinitionUrl()
@@ -301,7 +310,7 @@ class Task extends baseOMClass {
      * @param string[] $groups
      * @return boolean
      */
-    public function canBeClaimedBy($user, array $groups)
+    public function canBeClaimedBy($user, array $groups = [])
     {
         $identityLinks = $this->getIdentityLinks();
         foreach($identityLinks as $link)

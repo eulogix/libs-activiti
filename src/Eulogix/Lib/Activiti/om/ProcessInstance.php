@@ -54,11 +54,21 @@ class ProcessInstance extends baseOMClass {
         $tasks = $this->getClient()->getListOfTasks(array_merge([
                 'processInstanceId' => $this->getId()
             ],$queryHash));
-        for($i=0; $i<$tasks['total']; $i++) {
-            $taskArray = $tasks['data'][$i];
+        for($i=0; $i<$tasks->getTotal(); $i++) {
+            $taskArray = $tasks->getRow($i);
             $ret[] = new Task($taskArray, $this->getClient());
         }
         return $ret;
+    }
+
+    /**
+     * @param array $queryHash
+     * @return Task[]
+     */
+    public function getPendingTasks($queryHash=[]) {
+        return $this->getTasks(array_merge([
+            'taskDefinitionKey' => $this->getActivityId()
+        ], $queryHash));
     }
 
     /**
