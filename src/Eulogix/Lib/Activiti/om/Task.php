@@ -330,4 +330,31 @@ class Task extends baseOMClass {
         }, $identities);
     }
 
+    /**
+     * @return IdentityLink[]
+     */
+    public function getCandidateUsersLinks() {
+        return array_filter( $this->getIdentityLinks(), function(IdentityLink $link) { return $link->isCandidate() && $link->getUser(); });
+    }
+
+    /**
+     * @return IdentityLink[]
+     */
+    public function getCandidateGroupsLinks() {
+        return array_filter( $this->getIdentityLinks(), function(IdentityLink $link) { return $link->isCandidate() && $link->getGroup(); });
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getCandidateUsers() {
+        return array_map(function(IdentityLink $link) { return $link->getUser(); }, $this->getCandidateUsersLinks());
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getCandidateGroups() {
+        return array_map(function(IdentityLink $link) { return $link->getGroup(); }, $this->getCandidateGroupsLinks());
+    }
 } 
