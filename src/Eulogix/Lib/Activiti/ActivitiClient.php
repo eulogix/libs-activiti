@@ -77,6 +77,7 @@ class ActivitiClient {
 
         $statusCode = @$raw['statusCode'];
         $resultBody = @$raw['body'];
+
         $jsonDec = json_decode($resultBody, true);
 
         if($statusCode >= 200 && $statusCode < 300) {
@@ -101,9 +102,10 @@ class ActivitiClient {
                     $message.="$k\n";
             }
 
-            if($jsonDec !== null && isset($jsonDec['errorMessage'])) {
-                $message.="\n---\n".$jsonDec['errorMessage'];
-            }
+            foreach(['errorMessage', 'message', 'exception'] as $key)
+                if($jsonDec !== null && isset($jsonDec[$key])) {
+                    $message.="\n---\n{$key}: ".$jsonDec[$key];
+                }
 
             throw new \Exception($message, $statusCode);
         }
