@@ -305,9 +305,9 @@ class ActivitiClient {
                         procdef.key_ AS \"processDefinitionKey\"";
 
 
-        $from = "       FROM act_ru_task t
-                        LEFT JOIN act_re_procdef procdef ON procdef.id_= t.proc_def_id_
-                        LEFT JOIN act_ru_execution pi ON pi.id_ = t.proc_inst_id_";
+        $from = "       FROM ACT_RU_TASK t
+                        LEFT JOIN ACT_RE_PROCDEF procdef ON procdef.id_= t.proc_def_id_
+                        LEFT JOIN ACT_RU_EXECUTION pi ON pi.id_ = t.proc_inst_id_";
 
         $mainWhereClauses = ['TRUE'];
         $parameters = [];
@@ -347,7 +347,7 @@ class ActivitiClient {
                     break;
                 }
                 case 'candidateUser' : {
-                    $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE user_id_ = :candidateUser)";
+                    $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM ACT_RU_IDENTITYLINK WHERE user_id_ = :candidateUser)";
                     $parameters[':candidateUser'] = $v;
                     break;
                 }
@@ -360,9 +360,9 @@ class ActivitiClient {
                             $parameters[":candidateGroup{$i}"] = $vl;
                             $i++;
                         }
-                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE (". implode(' OR ', $conditions) . "))";
+                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM ACT_RU_IDENTITYLINK WHERE (". implode(' OR ', $conditions) . "))";
                     } else {
-                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM act_ru_identitylink WHERE group_id_ = :candidateGroup)";
+                        $assignmentWhereClauses[] = "t.id_ IN (SELECT task_id_ FROM ACT_RU_IDENTITYLINK WHERE group_id_ = :candidateGroup)";
                         $parameters[':candidateGroup'] = $v;
                         break;
                     }
@@ -376,18 +376,19 @@ class ActivitiClient {
 
         $mainWhereClauses[] = '('.implode(' OR ', $assignmentWhereClauses).')';
 
-        $orderBy = '';
-
         if($count) {
             $innerSQL = $select.' '.$from.' WHERE '.implode(' AND ', $mainWhereClauses);
 
-            $groupBy = "GROUP BY \"processDefinitionKey\"";
+            $groupBy = "GROUP BY processDefinitionKey";
             $orderBy = "ORDER BY task_count DESC";
-            return $this->returnSQLResultset("SELECT  \"processDefinitionKey\", count(*) as task_count "," FROM ( {$innerSQL} ) AS tmp_ ", " WHERE TRUE ", $groupBy, $orderBy, [
+            return $this->returnSQLResultset("SELECT  processDefinitionKey, count(*) as task_count "," FROM ( {$innerSQL} ) AS tmp_ ", " WHERE TRUE ", $groupBy, $orderBy, [
                 self::PARAM_START => 0,
                 self::PARAM_SIZE => 9999
             ], $parameters);
-        } else return $this->returnSQLResultset($select, $from, 'WHERE '.implode(' AND ', $mainWhereClauses), $groupBy = '', $orderBy, $inputHash, $parameters);
+        } else {
+            $orderBy = @$inputHash['sort'] ? "ORDER BY {$inputHash['sort']} ".($inputHash['order'] ?? 'ASC') : null;
+            return $this->returnSQLResultset($select, $from, 'WHERE '.implode(' AND ', $mainWhereClauses), $groupBy = '', $orderBy, $inputHash, $parameters);
+        }
     }
 
     /**
