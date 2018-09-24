@@ -1386,8 +1386,8 @@ class ActivitiClient {
 
      * @return ActivitiResult
      **/
-    public function createOrUpdateVariablesOnProcessInstance($processInstanceId) {
-        $requestBody = null;
+    public function createOrUpdateVariablesOnProcessInstance($processInstanceId, array $inputHash = []) {
+        $requestBody = $inputHash;
         $inputArray = ['processInstanceId' => $processInstanceId];
         $ret = $this->fetch('POST', 'runtime/process-instances/{processInstanceId}/variables', $requestBody, $inputArray, array (
                 0 => 'processInstanceId',
@@ -2643,6 +2643,7 @@ class ActivitiClient {
         $requestBody = null;
         $inputArray = ['processInstanceId' => $processInstanceId];
         $ret = $this->fetch('GET', 'history/historic-process-instances/{processInstanceId}', $requestBody, $inputArray, array (
+                0 => 'processInstanceId',
             ), array (
             ), array (
                 200 => 'Indicates that the historic process instances could be found.',
@@ -2914,6 +2915,7 @@ class ActivitiClient {
         $requestBody = null;
         $inputArray = ['taskId' => $taskId];
         $ret = $this->fetch('GET', 'history/historic-task-instances/{taskId}', $requestBody, $inputArray, array (
+                0 => 'taskId'
             ), array (
             ), array (
                 200 => 'Indicates that the historic task instances could be found.',
