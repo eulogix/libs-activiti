@@ -296,6 +296,7 @@ class ActivitiClient {
                         t.priority_ AS \"priority\",
                         t.create_time_ AS \"createTime\",
                         t.due_date_ AS \"dueDate\",
+                        t.category_ AS \"category\",
                         t.suspension_state_ AS \"suspended\",
                         t.tenant_id_ AS \"tenantId\",
                         t.form_key_ AS \"formKey\",
@@ -316,19 +317,27 @@ class ActivitiClient {
         foreach($inputHash as $k => $v) {
             switch($k) {
                 case 'processInstanceBusinessKeyLike' : {
-                    if(is_array($v)) {
-                        $conditions = [];
-                        $i = 0;
-                        foreach($v as $vl) {
-                            $conditions[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike{$i}";
-                            $parameters[":processInstanceBusinessKeyLike{$i}"] = $vl;
-                            $i++;
-                        }
-                        $mainWhereClauses[] = "(". implode(' OR ', $conditions) . ")";
-                    } else {
-                        $mainWhereClauses[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike";
-                        $parameters[':processInstanceBusinessKeyLike'] = $v;
+                    $keys = is_array($v) ? $v : [$v];
+                    $conditions = [];
+                    $i = 0;
+                    foreach($keys as $vl) {
+                        $conditions[] = "pi.business_key_ LIKE :processInstanceBusinessKeyLike{$i}";
+                        $parameters[":processInstanceBusinessKeyLike{$i}"] = $vl;
+                        $i++;
                     }
+                    $mainWhereClauses[] = "(". implode(' OR ', $conditions) . ")";
+                    break;
+                }
+                case 'processInstanceBusinessKeyNotLike' : {
+                    $keys = is_array($v) ? $v : [$v];
+                    $conditions = [];
+                    $i = 0;
+                    foreach($keys as $vl) {
+                        $conditions[] = "pi.business_key_ NOT LIKE :processInstanceBusinessKeyNotLike{$i}";
+                        $parameters[":processInstanceBusinessKeyNotLike{$i}"] = $vl;
+                        $i++;
+                    }
+                    $mainWhereClauses[] = "(". implode(' OR ', $conditions) . ")";
                     break;
                 }
                 case 'processDefinitionKeyLike' : {
@@ -379,9 +388,9 @@ class ActivitiClient {
         if($count) {
             $innerSQL = $select.' '.$from.' WHERE '.implode(' AND ', $mainWhereClauses);
 
-            $groupBy = "GROUP BY processDefinitionKey";
+            $groupBy = "GROUP BY processDefinitionKey, category";
             $orderBy = "ORDER BY task_count DESC";
-            return $this->returnSQLResultset("SELECT  processDefinitionKey, count(*) as task_count "," FROM ( {$innerSQL} ) AS tmp_ ", " WHERE TRUE ", $groupBy, $orderBy, [
+            return $this->returnSQLResultset("SELECT  processDefinitionKey, category, count(*) as task_count "," FROM ( {$innerSQL} ) AS tmp_ ", " WHERE TRUE ", $groupBy, $orderBy, [
                 self::PARAM_START => 0,
                 self::PARAM_SIZE => 9999
             ], $parameters);
