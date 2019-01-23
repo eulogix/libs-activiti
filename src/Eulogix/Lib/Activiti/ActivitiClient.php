@@ -60,7 +60,7 @@ class ActivitiClient {
 
         $realUrl = $url;
         $queryString = [];
-        foreach($urlParameterKeys as $paramName) {
+        foreach(array_merge($urlParameterKeys, ['sort','order','start','size']) as $paramName) {
             $paramValue = @$parameters[ $paramName ];
             $needle = "{{$paramName}}";
             if(strpos($realUrl, $needle)!==false)
