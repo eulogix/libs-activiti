@@ -3679,15 +3679,29 @@ class ActivitiClient {
 
     /**
      * Get a list of jobs
-
-     * @throws \Exception
-
+     * @param array $inputHash
      * @return ActivitiResult
-     **/
-    public function getListOfJobs() {
+     * @throws \Exception
+     */
+    public function getListOfJobs($inputHash = []) {
         $requestBody = null;
-        $inputArray = [];
+        $inputArray = array_merge($inputHash, []);
         $ret = $this->fetch('GET', 'management/jobs', $requestBody, $inputArray, array (
+                0 => 'id',
+                1 => 'processInstanceId',
+                2 => 'executionId',
+                3 => 'processDefinitionId',
+                4 => 'withRetriesLeft',
+                5 => 'executable',
+                6 => 'timersOnly',
+                7 => 'messagesOnly',
+                8 => 'withException',
+                9 => 'dueBefore',
+                10 => 'dueAfter',
+                11 => 'exceptionMessage',
+                12 => 'tenantId',
+                13 => 'tenantIdLike',
+                14 => 'withoutTenantId'
             ), array (
             ), array (
                 200 => 'Indicates the requested jobs were returned.',
